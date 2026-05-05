@@ -1,17 +1,15 @@
 import sqlite3
 import hashlib
-import os
 
-DB_PATH = "lumina.db"
+DB_PATH = "elearning.db"
 
 
 def _hash(password: str) -> str:
-    """SHA-256 ilə şifrəni hash edir."""
     return hashlib.sha256(password.encode()).hexdigest()
 
 
 def init_db():
- 
+    """Create users table if it does not exist."""
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     cur.execute("""
@@ -22,7 +20,6 @@ def init_db():
             pass  TEXT    NOT NULL
         )
     """)
-   
     con.commit()
     con.close()
 
@@ -36,8 +33,8 @@ def user_exists(email: str) -> bool:
     return result is not None
 
 
-def check_credentials(email: str, password: str) -> dict | None:
-   
+def check_credentials(email: str, password: str):
+    """Return user dict if credentials match, otherwise None."""
     con = sqlite3.connect(DB_PATH)
     cur = con.cursor()
     cur.execute(
@@ -51,10 +48,10 @@ def check_credentials(email: str, password: str) -> dict | None:
     return None
 
 
-def register_user(email: str, name: str, password: str) -> tuple[bool, str]:
- 
+def register_user(email: str, name: str, password: str):
+    """Returns (success, error_message)."""
     if user_exists(email):
-        return False, "Bu e-mail artıq qeydiyyatdan keçib"
+        return False, "This e-mail is already registered"
     try:
         con = sqlite3.connect(DB_PATH)
         cur = con.cursor()
