@@ -1,4 +1,12 @@
+"""
+Admin Management page – PDF page 7.
 
+Working interactions:
+  • Manage Students – Add / Edit / Delete (with confirm) / Search.
+  • Manage Courses  – Add / Edit / Archive / Search a mock course list.
+  • Issue Certificates – pick a completed student and bulk-issue.
+  • Verify Completion – approve / reject pending completions.
+"""
 import flet as ft
 import requests
 
@@ -493,13 +501,38 @@ def build_management_page(page: ft.Page, c) -> ft.Control:
             if not (name_f.value or "").strip():
                 err.value = "Name required"; err.visible = True
                 page.update(); return
-            s["name"]    = name_f.value.strip()
-            s["email"]   = (email_f.value or "n/a").strip()
-            s["program"] = (program_f.value or "General").strip()
-            s["status"]  = status_dd.value or "Active"
+            new_name    = name_f.value.strip()
+            new_email   = (email_f.value or "n/a").strip()
+            new_program = (program_f.value or "General").strip()
+            new_status  = status_dd.value or "Active"
+
+            try:
+                r = requests.put(f"{API_URL}/students/{s['id']}", json={
+                    "id":      s["id"],
+                    "name":    new_name,
+                    "email":   new_email,
+                    "program": new_program,
+                    "status":  new_status,
+                }, timeout=2)
+                api_result = r.json()
+            except Exception:
+                api_result = None
+            if api_result and "detail" in api_result:
+                err.value = api_result["detail"]
+                err.visible = True
+                page.update()
+                return
+
+            s["name"]    = new_name
+            s["email"]   = new_email
+            s["program"] = new_program
+            s["status"]  = new_status
             page.pop_dialog()
             refresh()
-            _toast(page, f"{s['id']} updated")
+            if api_result and "message" in api_result:
+                _toast(page, f"{s['id']} updated (API + local)")
+            else:
+                _toast(page, f"{s['id']} updated locally (API offline)")
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -530,6 +563,10 @@ def build_management_page(page: ft.Page, c) -> ft.Control:
             return
 
         def do_delete(_e):
+            try:
+                requests.delete(f"{API_URL}/students/{sid}", timeout=2)
+            except Exception:
+                pass
             _STUDENTS[:] = [x for x in _STUDENTS if x["id"] != sid]
             page.pop_dialog()
             refresh()

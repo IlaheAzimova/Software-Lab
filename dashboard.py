@@ -3,7 +3,6 @@ import flet as ft
 
 from theme import get_colors, PRIMARY, PRIMARY_BG
 from ui_widgets import avatar, initials_of, page_footer
-
 from lessons       import build_lessons_page, open_upload_lesson_dialog
 from analytics     import build_analytics_page
 from certificates  import build_certificates_page, open_manual_issue_dialog
@@ -11,7 +10,7 @@ from management    import build_management_page
 from assessment    import build_assessment_page
 
 
-def show_dashboard(page: ft.Page, user_email: str, on_logout):
+def show_dashboard(page: ft.Page, user_email: str, on_logout, user_role: str = "Student"):
     page.window.width  = 1200
     page.window.height = 780
     page.horizontal_alignment = ft.CrossAxisAlignment.START
@@ -28,7 +27,7 @@ def show_dashboard(page: ft.Page, user_email: str, on_logout):
 
     current_page = {"name": "Dashboard"}
 
-    # ─── Dashboard content ───────────────────────────────
+    # ─── Dashboard content 
     def stat_card(icon, icon_color, icon_bg, value, label, badge, badge_color):
         return ft.Container(
             expand=True, padding=ft.Padding.all(20),
@@ -134,22 +133,42 @@ def show_dashboard(page: ft.Page, user_email: str, on_logout):
             page.show_dialog(ft.SnackBar(content=ft.Text(msg, color="white"),
                                          bgcolor=color))
 
+        def deny_qa(action_name, allowed):
+            allowed_str = " / ".join(allowed)
+            toast(
+                f"🔒 Only {allowed_str} can {action_name}. "
+                f"You are signed in as {user_role}.",
+                color="#dc2626",
+            )
+
         def qa_upload_lesson(_e):
+            if not has_access("Upload New Lesson", QA_ACCESS):
+                deny_qa("upload lessons", QA_ACCESS["Upload New Lesson"])
+                return
             open_upload_lesson_dialog(
                 page, c,
                 on_added=lambda: (switch_page("Lessons"))
             )
 
         def qa_issue_certificate(_e):
+            if not has_access("Issue Certificate", QA_ACCESS):
+                deny_qa("issue certificates", QA_ACCESS["Issue Certificate"])
+                return
             open_manual_issue_dialog(
                 page, c,
                 on_added=lambda: (switch_page("Certificates"))
             )
 
         def qa_view_students(_e):
+            if not has_access("View Student List", QA_ACCESS):
+                deny_qa("view students", QA_ACCESS["View Student List"])
+                return
             switch_page("Management")
 
         def qa_create_assessment(_e):
+            if not has_access("Create Assessment", QA_ACCESS):
+                deny_qa("create assessments", QA_ACCESS["Create Assessment"])
+                return
             page.show_dialog(_create_assessment_dialog(page, c, switch_page, toast))
 
         quick_actions = ft.Container(
@@ -424,9 +443,68 @@ def show_dashboard(page: ft.Page, user_email: str, on_logout):
             ], spacing=10)
         )
 
+    # ── Role-based access control ────────────────────────
+    # Maps each protected action/page to the roles that may use it.
+    PAGE_ACCESS = {
+        "Dashboard":    ["Student", "Instructor", "Admin"],
+        "Lessons":      ["Student", "Instructor", "Admin"],   # all may view
+        "Assessment":   ["Student", "Instructor"],
+        "Analytics":    ["Student", "Instructor", "Admin"],
+        "Certificates": ["Student", "Admin"],
+        "Management":   ["Admin"],
+    }
+    # Protected Quick-Action handlers
+    QA_ACCESS = {
+        "Upload New Lesson":  ["Instructor"],
+        "Create Assessment":  ["Instructor"],
+        "View Student List":  ["Admin"],
+        "Issue Certificate":  ["Admin"],
+    }
+
+    def has_access(target: str, table: dict) -> bool:
+        return user_role in table.get(target, [])
+
+    def access_denied_view(target: str, allowed):
+        return ft.Container(
+            expand=True, alignment=ft.Alignment(0, 0),
+            content=ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=14,
+                controls=[
+                    ft.Container(
+                        width=80, height=80,
+                        bgcolor="#fee2e2", border_radius=40,
+                        alignment=ft.Alignment(0, 0),
+                        content=ft.Icon(ft.Icons.LOCK_OUTLINE,
+                                        size=36, color="#dc2626"),
+                    ),
+                    ft.Text("Access Denied", size=22,
+                            weight=ft.FontWeight.BOLD, color=c()["text"]),
+                    ft.Text(f"You are signed in as {user_role}.",
+                            size=13, color=c()["muted"]),
+                    ft.Text(f"Only {' / '.join(allowed)} can access "
+                            f"\u201C{target}\u201D.",
+                            size=13, color=c()["muted"]),
+                    ft.Container(height=4),
+                    ft.ElevatedButton(
+                        "Go back to Dashboard",
+                        style=ft.ButtonStyle(
+                            bgcolor=PRIMARY, color="white",
+                            shape=ft.RoundedRectangleBorder(radius=8),
+                        ),
+                        on_click=lambda e: switch_page("Dashboard"),
+                    ),
+                ]
+            )
+        )
+
     def switch_page(page_name):
         current_page["name"] = page_name
-        if page_name == "Dashboard":
+
+        if not has_access(page_name, PAGE_ACCESS):
+            allowed = PAGE_ACCESS.get(page_name, [])
+            inner = access_denied_view(page_name, allowed)
+        elif page_name == "Dashboard":
             inner = build_dashboard_content()
         elif page_name == "Lessons":
             inner = build_lessons_page(page, c)
@@ -463,7 +541,7 @@ def show_dashboard(page: ft.Page, user_email: str, on_logout):
             else ft.ThemeMode.LIGHT
         )
         # Re-render the whole shell to refresh colours
-        show_dashboard(page, user_email, on_logout)
+        show_dashboard(page, user_email, on_logout, user_role)
 
     sidebar = ft.Container(
         width=210, bgcolor=c()["sidebar"],
@@ -540,8 +618,11 @@ def show_dashboard(page: ft.Page, user_email: str, on_logout):
                     ft.Column([
                         ft.Text(f" {display_name}", size=13,
                                 weight=ft.FontWeight.BOLD, color=c()["text"]),
-                        ft.Text("INSTRUCTOR", size=10,
-                                weight=ft.FontWeight.BOLD, color=PRIMARY),
+                        ft.Text(user_role.upper(), size=10,
+                                weight=ft.FontWeight.BOLD,
+                                color={"Admin":      "#dc2626",
+                                       "Instructor": PRIMARY,
+                                       "Student":    "#2563eb"}.get(user_role, PRIMARY)),
                     ], spacing=0, horizontal_alignment=ft.CrossAxisAlignment.END),
                     ft.Container(
                         width=36, height=36, border_radius=18, bgcolor=PRIMARY,

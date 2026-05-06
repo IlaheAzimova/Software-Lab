@@ -1,4 +1,7 @@
-
+"""
+Assessment page – PDF page 4.
+Lessons → Assessment screen with the "Final Submission" confirmation dialog.
+"""
 import flet as ft
 
 from theme import PRIMARY, PRIMARY_BG

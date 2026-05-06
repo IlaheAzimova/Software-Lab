@@ -1,4 +1,14 @@
+"""
+Lesson Management page – PDF page 3.
 
+Buttons & interactions wired up in this version:
+  • Search filters the table live.
+  • Upload Lesson opens a dialog and inserts a new lesson.
+  • Preview opens a read-only details dialog.
+  • Edit opens a pre-filled edit dialog – saving updates the row.
+  • More (⋮) opens a popup menu: Toggle status / Duplicate / Delete.
+  • Previous / Next pagination really pages (5 per page).
+"""
 import flet as ft
 import requests
 
@@ -376,11 +386,34 @@ def build_lessons_page(page: ft.Page, c) -> ft.Control:
                 err.visible = True
                 page.update()
                 return
-            l["title"]    = title_f.value.strip()
+            new_title    = title_f.value.strip()
+            new_category = (cat_f.value or "General").strip()
+            new_status   = status_dd.value or "Draft"
+            new_level    = level_dd.value or "BEGINNER"
+
+            # PUT to FastAPI
+            try:
+                r = requests.put(f"{API_URL}/lessons/{l['id']}", json={
+                    "id":       l["id"],
+                    "title":    new_title,
+                    "category": new_category,
+                    "level":    new_level,
+                    "status":   new_status,
+                }, timeout=2)
+                api_result = r.json()
+            except Exception:
+                api_result = None
+            if api_result and "detail" in api_result:
+                err.value = api_result["detail"]
+                err.visible = True
+                page.update()
+                return
+
+            l["title"]    = new_title
             l["desc"]     = (desc_f.value or "").strip() or "—"
-            l["category"] = (cat_f.value or "General").strip()
-            l["status"]   = status_dd.value or "Draft"
-            l["level"]    = level_dd.value or "BEGINNER"
+            l["category"] = new_category
+            l["status"]   = new_status
+            l["level"]    = new_level
             l["level_kind"] = {
                 "BEGINNER": "success",
                 "INTERMEDIATE": "info",
@@ -388,7 +421,10 @@ def build_lessons_page(page: ft.Page, c) -> ft.Control:
             }.get(l["level"], "neutral")
             page.pop_dialog()
             render_rows()
-            _toast(page, f"Lesson {l['id']} updated")
+            if api_result and "message" in api_result:
+                _toast(page, f"Lesson {l['id']} updated (API + local)")
+            else:
+                _toast(page, f"Lesson {l['id']} updated locally (API offline)")
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -445,6 +481,10 @@ def build_lessons_page(page: ft.Page, c) -> ft.Control:
             return
 
         def do_delete(_e):
+            try:
+                requests.delete(f"{API_URL}/lessons/{lid}", timeout=2)
+            except Exception:
+                pass
             _LESSONS[:] = [x for x in _LESSONS if x["id"] != lid]
             page.pop_dialog()
             render_rows()

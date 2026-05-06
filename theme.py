@@ -1,7 +1,5 @@
 import flet as ft
 
-
-
 LIGHT = {
     "bg":             "#f3f6f5",
     "card":           "#ffffff",

@@ -73,6 +73,50 @@ def build_register(page: ft.Page, on_register_success, on_go_login):
         bgcolor=c()["field_bg"], border_color=c()["border"],
     )
 
+    # ── role picker (Student / Instructor / Admin) ──────
+    role_state = {"value": "Student"}
+    role_buttons = {}
+
+    def make_role_btn(role_name):
+        btn = ft.Container(
+            border_radius=8,
+            padding=ft.Padding.symmetric(horizontal=12, vertical=10),
+            on_click=lambda e, r=role_name: select_role(r),
+        )
+        role_buttons[role_name] = btn
+        return btn
+
+    def select_role(role_name):
+        role_state["value"] = role_name
+        for r, b in role_buttons.items():
+            is_active = (r == role_name)
+            b.bgcolor = PRIMARY if is_active else "transparent"
+            b.border = None if is_active else ft.Border.all(1, c()["border"])
+            inner = b.content
+            if inner is not None:
+                for ctrl in inner.controls:
+                    if isinstance(ctrl, ft.Text):
+                        ctrl.color = "white" if is_active else c()["text"]
+                        ctrl.weight = ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL
+                    elif isinstance(ctrl, ft.Icon):
+                        ctrl.color = "white" if is_active else c()["muted"]
+        page.update()
+
+    def role_btn_with_icon(name, icon):
+        b = make_role_btn(name)
+        b.content = ft.Row(spacing=6, tight=True, controls=[
+            ft.Icon(icon, size=14, color=c()["muted"]),
+            ft.Text(name, size=12, color=c()["text"]),
+        ])
+        return b
+
+    role_picker = ft.Row(spacing=8, controls=[
+        role_btn_with_icon("Student",    ft.Icons.SCHOOL_OUTLINED),
+        role_btn_with_icon("Instructor", ft.Icons.CAST_FOR_EDUCATION_OUTLINED),
+        role_btn_with_icon("Admin",      ft.Icons.ADMIN_PANEL_SETTINGS_OUTLINED),
+    ])
+    select_role("Student")    # default highlight
+
     name_error    = ft.Text("", color="#dc2626", size=11, visible=False)
     email_error   = ft.Text("", color="#dc2626", size=11, visible=False)
     pass_error    = ft.Text("", color="#dc2626", size=11, visible=False)
@@ -177,7 +221,8 @@ def build_register(page: ft.Page, on_register_success, on_go_login):
         # Try the API first
         try:
             r = requests.post(f"{API_URL}/register",
-                              json={"email": ev, "name": nv, "password": pv},
+                              json={"email": ev, "name": nv, "password": pv,
+                                    "role": role_state["value"]},
                               timeout=2)
             api_result = r.json()
         except Exception:
@@ -196,7 +241,7 @@ def build_register(page: ft.Page, on_register_success, on_go_login):
             return
 
         # API offline → fall back to local SQLite
-        success, err_msg = register_user(ev, nv, pv)
+        success, err_msg = register_user(ev, nv, pv, role_state["value"])
         if success:
             show_banner("Registration completed successfully! Redirecting...", success=True)
             page.update()
@@ -270,6 +315,7 @@ def build_register(page: ft.Page, on_register_success, on_go_login):
                 ft.Container(width=340, content=ft.Column([label("EMAIL"),            email_field,    email_error],   spacing=4)),
                 ft.Container(width=340, content=ft.Column([label("PASSWORD"),         password_field, pass_error],    spacing=4)),
                 ft.Container(width=340, content=ft.Column([label("CONFIRM PASSWORD"), confirm_field,  confirm_error], spacing=4)),
+                ft.Container(width=340, content=ft.Column([label("REGISTER AS"),      role_picker], spacing=4)),
 
                 ft.ElevatedButton(
                     "Register", width=340, height=45,

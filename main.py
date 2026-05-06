@@ -1,4 +1,7 @@
-
+"""
+E-Learning Progress Analytics
+Main entry point. Routes the user between login, register, and dashboard screens.
+"""
 
 import flet as ft
 
@@ -45,10 +48,11 @@ def main(page: ft.Page):
             on_go_login=go_login,
         )
 
-    def go_dashboard(user_email: str):
+    def go_dashboard(user_email: str, user_role: str = "Student"):
         show_dashboard(
             page,
             user_email=user_email or "user@example.com",
+            user_role=user_role,
             on_logout=go_login,
         )
 

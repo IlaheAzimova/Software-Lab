@@ -134,7 +134,8 @@ def build_login(page: ft.Page, on_login_success, on_go_register):
             else:
                 hide_banner()
                 page.update()
-                on_login_success(result["user"]["email"])
+                u = result["user"]
+                on_login_success(u["email"], u.get("role", "Student"))
                 return
 
         # API unreachable – fall back to local SQLite check
@@ -144,7 +145,7 @@ def build_login(page: ft.Page, on_login_success, on_go_register):
         else:
             hide_banner()
             page.update()
-            on_login_success(user["email"])
+            on_login_success(user["email"], user.get("role", "Student"))
             return
 
         page.update()

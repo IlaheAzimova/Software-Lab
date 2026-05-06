@@ -1,4 +1,16 @@
+"""
+Progress Analytics page – PDF page 5.
 
+Wired interactions in this version:
+  • "Filter by Student ID..." is a real text input – live-filters the score table.
+  • "All Categories" opens a category-picker dialog – live-filters the table.
+  • "Last 30 Days" opens a date-range picker – sets the active label.
+  • "Export Report" writes a CSV snapshot and shows a toast.
+  • "View All Records" opens a scrollable dialog of every row.
+
+Charts are drawn with plain Flet primitives (Container / Stack) so the
+page works without the optional ``flet-charts`` extension package.
+"""
 import csv
 import os
 import tempfile

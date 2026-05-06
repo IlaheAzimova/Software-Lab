@@ -1,4 +1,15 @@
+"""
+Certificates page – PDF page 6.
 
+Wired interactions in this version:
+  • Search filters live by student name, course, code, or ID.
+  • Manual Issue opens a dialog and inserts a new certificate (Pending).
+  • Download icon shows a snackbar simulating PDF export.
+  • Open icon opens a "certificate preview" dialog.
+  • More (⋮) menu: Verify / Mark Pending / Revoke (deletes).
+  • Filter button opens a status filter popup.
+  • Previous / Next pagination really pages (5 per page).
+"""
 import flet as ft
 import requests
 
@@ -381,9 +392,26 @@ def build_certificates_page(page: ft.Page, c) -> ft.Control:
         cert = _find(cid)
         if cert is None:
             return
-        cert["status"] = "Pending" if cert["status"] == "Verified" else "Verified"
+        new_status = "Pending" if cert["status"] == "Verified" else "Verified"
+
+        try:
+            r = requests.put(f"{API_URL}/certificates/{cid}", json={
+                "id":      cid,
+                "student": cert["student"],
+                "course":  cert["course"],
+                "code":    cert["code"],
+                "status":  new_status,
+            }, timeout=2)
+            api_result = r.json()
+        except Exception:
+            api_result = None
+        if api_result and "detail" in api_result:
+            _toast(page, api_result["detail"], "#dc2626")
+            return
+
+        cert["status"] = new_status
         render_rows()
-        _toast(page, f"{cid} marked as {cert['status']}")
+        _toast(page, f"{cid} marked as {new_status}")
 
     def _confirm_revoke(cid):
         cert = _find(cid)
@@ -391,6 +419,10 @@ def build_certificates_page(page: ft.Page, c) -> ft.Control:
             return
 
         def do_revoke(_e):
+            try:
+                requests.delete(f"{API_URL}/certificates/{cid}", timeout=2)
+            except Exception:
+                pass
             _CERTS[:] = [x for x in _CERTS if x["id"] != cid]
             page.pop_dialog()
             render_rows()
